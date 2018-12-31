@@ -1,1 +1,1 @@
-# KingRx -ReactiveExtension Library like C#
+# KingRx -ReactiveExtension Library for C++ like C#
