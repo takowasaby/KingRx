@@ -1,6 +1,4 @@
 #include "stdafx.h"
-#include "Sample.h"
-#include <iostream>
 
 using namespace std;
 
