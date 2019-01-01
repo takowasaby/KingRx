@@ -1,5 +1,6 @@
 #pragma once
 #include <exception>
+#include <memory>
 
 namespace rx
 {
@@ -14,8 +15,8 @@ namespace rx
 	{
 	public:
 		virtual ~IObserver() = 0;
-		virtual void OnNext(T value) = 0;
-		virtual void OnError(std::exception error) = 0;
+		virtual void OnNext(const T& value) = 0;
+		virtual void OnError(std::unique_ptr<std::exception> error) = 0;
 		virtual void OnComprated() = 0;
 	};
 
@@ -24,6 +25,6 @@ namespace rx
 	{
 	public:
 		virtual ~IObservable() = 0;
-		IDisposable Subscribe() = 0;
+		std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver> observer) = 0;
 	};
 }
