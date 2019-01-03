@@ -17,16 +17,15 @@ namespace rx
 	public:
 		virtual ~IObserver() {};
 		virtual void OnNext(const T& value) = 0;
-		virtual void OnError(std::unique_ptr<TException> error) = 0;
-		virtual void OnCompleted() = 0;
-		virtual bool operator==(const IObserver<T, TException>& other) = 0;
+		virtual void OnError(const TException& error) = 0;
+		virtual void OnCompleted() noexcept = 0;
 	};
 
-	template<typename T>
+	template<typename T, typename TException = std::exception>
 	class IObservable
 	{
 	public:
 		virtual ~IObservable() {};
-		virtual std::unique_ptr<IDisposable> Subscribe(std::shared_ptr<IObserver<T>> observer) = 0;
+		virtual std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver<T, TException>>&& observer) = 0;
 	};
 }
