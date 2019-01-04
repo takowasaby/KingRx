@@ -5,10 +5,7 @@ namespace rx
 {
 	namespace subject
 	{
-		template<typename TSource, typename TResult, typename TException>
-		class ISubject : public IObservable<TSource, TException>, public IObserver<TResult, TException>{};
-
 		template<typename T, typename TException>
-		class ISubject : public ISubject<T, T, TException>{};
+		class ISubject : public IObservable<T, TException>, public IObserver<T, TException>{};
 	}
 }
