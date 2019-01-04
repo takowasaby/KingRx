@@ -15,8 +15,9 @@ namespace rx
 			void OnNext(const T& value) override;
 			void OnError(const TException& error) override;
 			void OnCompleted() noexcept override;
+
 			std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver<T, TException>>&& observer) override;
-			void Dispose() noexcept;
+
 			bool HasObservers() const noexcept;
 			bool IsDisposed() const noexcept;
 		private:
@@ -114,13 +115,6 @@ namespace rx
 				_hasObservers = true;
 
 			return spSubjectDisposable;
-		}
-
-		template<typename T, typename TException>
-		inline void Subject<T, TException>::Dispose() noexcept
-		{
-			std::unique_ptr<TException>().swap(_exception);
-			disposeProcess();
 		}
 
 		template<typename T, typename TException>
