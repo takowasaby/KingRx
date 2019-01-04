@@ -17,6 +17,19 @@ namespace rx
 			void OnCompleted() noexcept override;
 
 			std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver<T, TException>>&& observer) override;
+			std::shared_ptr<IDisposable> Subscribe(const IObserver<T, TException>& observer);
+			std::shared_ptr<IDisposable> Subscribe(
+				std::function<void(const T& value)> onNext,
+				std::function<void(const TException& error)> onError,
+				std::function<void()> onCompleted
+			);
+			std::shared_ptr<IDisposable> Subscribe(
+				std::function<void(const T& value)> onNext,
+				std::function<void()> onCompleted
+			);
+			std::shared_ptr<IDisposable> Subscribe(
+				std::function<void(const T& value)> onNext
+			);
 
 			bool HasObservers() const noexcept;
 			bool IsDisposed() const noexcept;
