@@ -1,5 +1,5 @@
 #pragma once
-#include "SubjectBase.h"
+#include "SubjectDisposable.h"
 #include <map>
 
 namespace rx
@@ -7,7 +7,7 @@ namespace rx
 	namespace subject
 	{
 		template<typename T, typename TException = std::exception>
-		class Subject : public SubjectBase<T, TException>
+		class Subject : public ISubject<T, TException>
 		{
 		public:
 			Subject();
@@ -17,10 +17,14 @@ namespace rx
 			void OnCompleted() noexcept override;
 			std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver<T, TException>>&& observer) override;
 			void Dispose() noexcept;
+			bool HasObservers() const noexcept;
+			bool IsDisposed() const noexcept;
 		private:
 			std::map<unsigned, std::shared_ptr<SubjectDisposable<T, TException>>> _observers;
 			std::unique_ptr<TException> _exception;
 			unsigned _observerCount;
+			bool _hasObservers;
+			bool _isDisposed;
 
 			void disposeProcess() noexcept;
 			std::function<void()> makeDisposableFunc();
@@ -28,8 +32,10 @@ namespace rx
 
 		template<typename T, typename TException>
 		inline Subject<T, TException>::Subject() :
+			_exception(nullptr),
 			_observerCount(0),
-			_exception(nullptr)
+			_hasObservers(false),
+			_isDisposed(false)
 		{
 		}
 
@@ -101,6 +107,7 @@ namespace rx
 
 			auto disposeFunc = makeDisposableFunc();
 			auto spSubjectDisposable = std::make_shared<SubjectDisposable<T, TException>>(std::move(observer), disposeFunc);
+			_observers.insert(std::pair<unsigned, std::shared_ptr<SubjectDisposable<T, TException>>>(_observerCount, spSubjectDisposable));
 
 			_observerCount++;
 			if (!_hasObservers)
@@ -117,13 +124,25 @@ namespace rx
 		}
 
 		template<typename T, typename TException>
+		inline bool Subject<T, TException>::HasObservers() const noexcept
+		{
+			return _hasObservers;
+		}
+
+		template<typename T, typename TException>
+		inline bool Subject<T, TException>::IsDisposed() const noexcept
+		{
+			return _isDisposed;
+		}
+
+		template<typename T, typename TException>
 		inline void Subject<T, TException>::disposeProcess() noexcept
 		{
 			_isDisposed = true;
 			_hasObservers = false;
 			for (auto obs : _observers)
 			{
-				obs.second->nullifiacation();
+				obs.second->nullification();
 			}
 			std::map<unsigned, std::shared_ptr<SubjectDisposable<T, TException>>>().swap(_observers);
 		}
@@ -135,7 +154,7 @@ namespace rx
 			{
 				auto itr = observers.find(observerNum);
 				if (itr != observers.end())
-					if (*itr)
+					if ((*itr).second)
 						observers.erase(itr);
 				if (observers.size() == 0)
 					hasObservers = false;

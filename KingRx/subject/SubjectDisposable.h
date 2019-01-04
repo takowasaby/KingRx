@@ -9,27 +9,6 @@ namespace rx
 	namespace subject
 	{
 		template<typename T, typename TException>
-		class SubjectBase : public ISubject<T, TException>, public IDisposable
-		{
-		public:
-			SubjectBase() :
-				_hasObservers(false),
-				_isDisposed(false)
-			{}
-			bool HasObservers() const noexcept
-			{
-				return _hasObservers;
-			}
-			bool IsDisposed() const noexcept
-			{
-				return _isDisposed;
-			}
-		protected:
-			bool _hasObservers;
-			bool _isDisposed;
-		};
-
-		template<typename T, typename TException>
 		class SubjectDisposable : public IDisposable, public IObserver<T, TException>
 		{
 		public:
