@@ -16,7 +16,7 @@ namespace rx
 			WriteOnlyProperty(const WriteOnlyProperty& ref) : PropertyBase<T>(ref) {}
 			virtual ~WriteOnlyProperty() {}
 		public:
-			Property<T, Getter, Setter>& operator = (const T& value) { this->_value = this->Set(value); return *this; }
+			Property<T, Setter>& operator = (const T& value) { this->_value = this->Set(value); return *this; }
 		};
 	}
 }
