@@ -25,7 +25,7 @@ namespace rx
 			);
 			std::shared_ptr<IDisposable> Subscribe(
 				std::function<void(const T& value)> onNext,
-				std::function<void()> onError
+				std::function<void(const TException& error)> onError
 			);
 			std::shared_ptr<IDisposable> Subscribe(
 				std::function<void(const T& value)> onNext,
