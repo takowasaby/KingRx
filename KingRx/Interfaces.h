@@ -7,24 +7,25 @@ namespace rx
 	class IDisposable
 	{
 	public:
+		virtual ~IDisposable() {};
 		virtual void Dispose() = 0;
 	};
 
-	template<typename T>
+	template<typename T, typename TException = std::exception>
 	class IObserver
 	{
 	public:
-		virtual ~IObserver() = 0;
+		virtual ~IObserver() {};
 		virtual void OnNext(const T& value) = 0;
-		virtual void OnError(std::unique_ptr<std::exception> error) = 0;
-		virtual void OnComprated() = 0;
+		virtual void OnError(const TException& error) = 0;
+		virtual void OnCompleted() noexcept = 0;
 	};
 
-	template<typename T>
+	template<typename T, typename TException = std::exception>
 	class IObservable
 	{
 	public:
-		virtual ~IObservable() = 0;
-		std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver> observer) = 0;
+		virtual ~IObservable() {};
+		virtual std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver<T, TException>>&& observer) = 0;
 	};
 }
