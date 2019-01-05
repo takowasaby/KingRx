@@ -1,6 +1,7 @@
 #pragma once
 #include "SubjectDisposable.h"
 #include <map>
+#include "../AnonymousObserver.h"
 
 namespace rx
 {
@@ -17,6 +18,22 @@ namespace rx
 			void OnCompleted() noexcept override;
 
 			std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver<T, TException>>&& observer) override;
+			std::shared_ptr<IDisposable> Subscribe(
+				std::function<void(const T& value)> onNext,
+				std::function<void(const TException& error)> onError,
+				std::function<void()> onCompleted
+			);
+			std::shared_ptr<IDisposable> Subscribe(
+				std::function<void(const T& value)> onNext,
+				std::function<void(const TException& error)> onError
+			);
+			std::shared_ptr<IDisposable> Subscribe(
+				std::function<void(const T& value)> onNext,
+				std::function<void()> onCompleted
+			);
+			std::shared_ptr<IDisposable> Subscribe(
+				std::function<void(const T& value)> onNext
+			);
 
 			bool HasObservers() const noexcept;
 			bool IsDisposed() const noexcept;
@@ -108,13 +125,37 @@ namespace rx
 
 			auto disposeFunc = makeDisposableFunc();
 			auto spSubjectDisposable = std::make_shared<SubjectDisposable<T, TException>>(std::move(observer), disposeFunc);
-			_observers.insert(std::pair<unsigned, std::shared_ptr<SubjectDisposable<T, TException>>>(_observerCount, spSubjectDisposable));
+			_observers.insert(std::make_pair(_observerCount, spSubjectDisposable));
 
 			_observerCount++;
 			if (!_hasObservers)
 				_hasObservers = true;
 
 			return spSubjectDisposable;
+		}
+
+		template<typename T, typename TException>
+		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::function<void(const T&value)> onNext, std::function<void(const TException&error)> onError, std::function<void()> onCompleted)
+		{
+			return Subscribe(std::make_unique<AnonymousObserver<T, TException>>(onNext, onError, onCompleted));
+		}
+
+		template<typename T, typename TException>
+		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::function<void(const T&value)> onNext, std::function<void(const TException&error)> onError)
+		{
+			return Subscribe(std::make_unique<AnonymousObserver<T, TException>>(onNext, onError));
+		}
+
+		template<typename T, typename TException>
+		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::function<void(const T&value)> onNext, std::function<void()> onCompleted)
+		{
+			return Subscribe(std::make_unique<AnonymousObserver<T, TException>>(onNext, onCompleted));
+		}
+
+		template<typename T, typename TException>
+		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::function<void(const T&value)> onNext)
+		{
+			return Subscribe(std::make_unique<AnonymousObserver<T, TException>>(onNext));
 		}
 
 		template<typename T, typename TException>
