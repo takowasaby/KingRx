@@ -1,6 +1,5 @@
 #pragma once
-#include "ISubject.h"
-#include "../Property.h"
+#include "../Interfaces.h"
 #include <memory>
 #include <functional>
 

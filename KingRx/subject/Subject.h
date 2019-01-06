@@ -1,5 +1,6 @@
 #pragma once
 #include "SubjectDisposable.h"
+#include "SubjectBase.h"
 #include <map>
 #include "../AnonymousObserver.h"
 
@@ -8,35 +9,19 @@ namespace rx
 	namespace subject
 	{
 		template<typename T, typename TException = std::exception>
-		class Subject : public ISubject<T, TException>
+		class Subject : public SubjectBase<T, TException>
 		{
 		public:
 			Subject();
 			~Subject();
+			bool HasObservers() const noexcept override;
+			bool IsDisposed() const noexcept override;
+
 			void OnNext(const T& value) override;
 			void OnError(const TException& error) override;
 			void OnCompleted() noexcept override;
-
-			std::shared_ptr<IDisposable> Subscribe(std::unique_ptr<IObserver<T, TException>>&& observer) override;
-			std::shared_ptr<IDisposable> Subscribe(
-				std::function<void(const T& value)> onNext,
-				std::function<void(const TException& error)> onError,
-				std::function<void()> onCompleted
-			);
-			std::shared_ptr<IDisposable> Subscribe(
-				std::function<void(const T& value)> onNext,
-				std::function<void(const TException& error)> onError
-			);
-			std::shared_ptr<IDisposable> Subscribe(
-				std::function<void(const T& value)> onNext,
-				std::function<void()> onCompleted
-			);
-			std::shared_ptr<IDisposable> Subscribe(
-				std::function<void(const T& value)> onNext
-			);
-
-			bool HasObservers() const noexcept;
-			bool IsDisposed() const noexcept;
+		protected:
+			std::shared_ptr<IDisposable> SubscribeCore(std::unique_ptr<IObserver<T, TException>>&& observer) override;
 		private:
 			std::map<unsigned, std::shared_ptr<SubjectDisposable<T, TException>>> _observers;
 			std::unique_ptr<TException> _exception;
@@ -62,8 +47,20 @@ namespace rx
 		{
 			if (_hasObservers == true && _isDisposed == false)
 			{
-				OnCompleted();
+				disposeProcess();
 			}
+		}
+
+		template<typename T, typename TException>
+		inline bool Subject<T, TException>::HasObservers() const noexcept
+		{
+			return _hasObservers;
+		}
+
+		template<typename T, typename TException>
+		inline bool Subject<T, TException>::IsDisposed() const noexcept
+		{
+			return _isDisposed;
 		}
 
 		template<typename T, typename TException>
@@ -106,7 +103,7 @@ namespace rx
 		}
 
 		template<typename T, typename TException>
-		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::unique_ptr<IObserver<T, TException>>&& observer)
+		inline std::shared_ptr<IDisposable> Subject<T, TException>::SubscribeCore(std::unique_ptr<IObserver<T, TException>>&& observer)
 		{
 			if (!observer)
 				throw std::exception();
@@ -132,42 +129,6 @@ namespace rx
 				_hasObservers = true;
 
 			return spSubjectDisposable;
-		}
-
-		template<typename T, typename TException>
-		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::function<void(const T&value)> onNext, std::function<void(const TException&error)> onError, std::function<void()> onCompleted)
-		{
-			return Subscribe(std::make_unique<AnonymousObserver<T, TException>>(onNext, onError, onCompleted));
-		}
-
-		template<typename T, typename TException>
-		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::function<void(const T&value)> onNext, std::function<void(const TException&error)> onError)
-		{
-			return Subscribe(std::make_unique<AnonymousObserver<T, TException>>(onNext, onError));
-		}
-
-		template<typename T, typename TException>
-		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::function<void(const T&value)> onNext, std::function<void()> onCompleted)
-		{
-			return Subscribe(std::make_unique<AnonymousObserver<T, TException>>(onNext, onCompleted));
-		}
-
-		template<typename T, typename TException>
-		inline std::shared_ptr<IDisposable> Subject<T, TException>::Subscribe(std::function<void(const T&value)> onNext)
-		{
-			return Subscribe(std::make_unique<AnonymousObserver<T, TException>>(onNext));
-		}
-
-		template<typename T, typename TException>
-		inline bool Subject<T, TException>::HasObservers() const noexcept
-		{
-			return _hasObservers;
-		}
-
-		template<typename T, typename TException>
-		inline bool Subject<T, TException>::IsDisposed() const noexcept
-		{
-			return _isDisposed;
 		}
 
 		template<typename T, typename TException>
