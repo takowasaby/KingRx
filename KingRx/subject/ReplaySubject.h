@@ -13,36 +13,99 @@ namespace rx
 		class ReplaySubject : public SubjectBase<T, TException>
 		{
 		public:
-			ReplaySubject();
-			ReplaySubject(size_t bufferSize);
+			ReplaySubject() :
+				_replaySubjectImpl(ReplaySubjectImplBuffer(UINT_MAX))
+			{}
+			ReplaySubject(size_t bufferSize) :
+				_replaySubjectImpl(ReplaySubjectImplBuffer(bufferSize))
+			{}
 			template<class Rep, class Period>
-			ReplaySubject(std::chrono::duration<Rep, Period> window);
+			ReplaySubject(std::chrono::duration<Rep, Period> window) :
+				_replaySubjectImpl(ReplaySubjectImplTime(window))
+			{}
 			template<class Rep, class Period>
-			ReplaySubject(size_t bufferSize, std::chrono::duration<Rep, Period> window);
+			ReplaySubject(size_t bufferSize, std::chrono::duration<Rep, Period> window) :
+				_replaySubjectImpl(ReplaySubjectImplTime(bufferSize, window))
+			{}
 
-			~ReplaySubject();
+			bool HasObservers() const noexcept override
+			{
+				return _replaySubjectImpl.HasObservers();
+			}
+			bool IsDisposed() const noexcept override
+			{
+				return _replaySubjectImpl.IsDisposed();
+			}
 
-			bool HasObservers() const noexcept override;
-			bool IsDisposed() const noexcept override;
-
-			void OnNext(const T& value) override;
-			void OnError(const TException& error) override;
-			void OnCompleted() noexcept override;
+			void OnNext(const T& value) override
+			{
+				_replaySubjectImpl.OnNext(value);
+			}
+			void OnError(const TException& error) override
+			{
+				_replaySubjectImpl.OnError(error);
+			}
+			void OnCompleted() noexcept override
+			{
+				_replaySubjectImpl.OnCompleted();
+			}
 
 		protected:
-			std::shared_ptr<IDisposable> SubscribeCore(std::unique_ptr<IObserver<T, TException>>&& observer) override;
+			std::shared_ptr<IDisposable> SubscribeCore(std::unique_ptr<IObserver<T, TException>>&& observer) override
+			{
+				if (!observer)
+					throw std::exception();
+				_replaySubjectImpl.Subscribe(std::move(observer));
+			}
 
 		private:
 			template<typename T, typename TException = std::exception>
 			class ReplaySubjectImplBase : public SubjectBase<T, TException>
 			{
 			public:
-				bool HasObservers() const noexcept override;
-				bool IsDisposed() const noexcept override;
+				bool HasObservers() const noexcept override
+				{
+					return _hasObservers;
+				}
+				bool IsDisposed() const noexcept override
+				{
+					return _isDisposed;
+				}
 
-				void OnNext(const T& value) override;
-				void OnError(const TException& error) override;
-				void OnCompleted() noexcept override;
+				void OnNext(const T& value) override
+				{
+					if (_hasObservers == true && _isDisposed == false)
+					{
+						this->cacheValue(value);
+						for (auto obs : _observers)
+						{
+							obs.second->OnNext(value);
+						}
+					}
+				}
+				void OnError(const TException& error) override
+				{
+					if (_hasObservers == true && _isDisposed == false)
+					{
+						_exception = std::make_unique<TException>(error);
+						for (auto obs : _observers)
+						{
+							obs.second->OnError(error);
+						}
+					}
+					disposeProcess();
+				}
+				void OnCompleted() noexcept override
+				{
+					if (_hasObservers == true && _isDisposed == false)
+					{
+						for (auto obs : _observers)
+						{
+							obs.second->OnCompleted();
+						}
+					}
+					disposeProcess();
+				}
 			protected:
 				std::shared_ptr<IDisposable> SubscribeCore(std::unique_ptr<IObserver<T, TException>>&& observer) override;
 				
@@ -83,7 +146,7 @@ namespace rx
 				void trimingValues() override;
 			};
 
-			ReplaySubjectImplBase<T, TException> _replaySubjectImplBase;
+			ReplaySubjectImplBase<T, TException> _replaySubjectImpl;
 		};
 	}
 }
