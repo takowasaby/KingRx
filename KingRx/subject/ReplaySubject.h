@@ -76,7 +76,7 @@ namespace rx
 				{
 					if (_hasObservers == true && _isDisposed == false)
 					{
-						this->cacheValue(value);
+						cacheValue(value);
 						for (auto obs : _observers)
 						{
 							obs.second->OnNext(value);
@@ -107,7 +107,34 @@ namespace rx
 					disposeProcess();
 				}
 			protected:
-				std::shared_ptr<IDisposable> SubscribeCore(std::unique_ptr<IObserver<T, TException>>&& observer) override;
+				std::shared_ptr<IDisposable> SubscribeCore(std::unique_ptr<IObserver<T, TException>>&& observer) override
+				{
+					std::unique_ptr<IObserver<T, TException>> upObserver = std::move(observer);
+					trimingValues();
+					replay(upObserver);
+					if (_isDisposed)
+					{
+						if (_exception)
+						{
+							observer->OnError(*_exception);
+						}
+						else
+						{
+							observer->OnCompleted();
+						}
+						return std::shared_ptr<IDisposable>();
+					}
+
+					auto disposeFunc = makeDisposableFunc();
+					auto spSubjectDisposable = std::make_shared<SubjectDisposable<T, TException>>(std::move(observer), disposeFunc);
+					_observers.insert(std::make_pair(_observerCount, spSubjectDisposable));
+
+					_observerCount++;
+					if (!_hasObservers)
+						_hasObservers = true;
+
+					return spSubjectDisposable;
+				}
 				
 				virtual void cacheValue(const T& value) = 0;
 				virtual size_t replay(std::unique_ptr<IObserver<T, TException>>& observer) = 0;
@@ -119,8 +146,28 @@ namespace rx
 				bool _hasObservers;
 				bool _isDisposed;
 
-				void disposeProcess() noexcept;
-				std::function<void()> makeDisposableFunc();
+				void disposeProcess() noexcept
+				{
+					_isDisposed = true;
+					_hasObservers = false;
+					for (auto obs : _observers)
+					{
+						obs.second->nullification();
+					}
+					std::map<unsigned, std::shared_ptr<SubjectDisposable<T, TException>>>().swap(_observers);
+				}
+				std::function<void()> makeDisposableFunc()
+				{
+					return [&hasObservers = _hasObservers, &observers = _observers, observerNum = _observerCount]()
+					{
+						auto itr = observers.find(observerNum);
+						if (itr != observers.end())
+							if ((*itr).second)
+								observers.erase(itr);
+						if (observers.size() == 0)
+							hasObservers = false;
+					};
+				}
 			};
 
 			template<typename T, typename TException = std::exception>
