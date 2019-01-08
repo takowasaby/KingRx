@@ -4,28 +4,31 @@
 #include "../AnonymousObserver.h"
 #include <map>
 #include <chrono>
+#include <queue>
 
 namespace rx
 {
 	namespace subject
 	{
-		template<typename T, typename TException = std::exception>
+		using DefaultClock = std::chrono::system_clock;
+
+		template<typename T, typename TException = std::exception, typename TClock = DefaultClock>
 		class ReplaySubject : public SubjectBase<T, TException>
 		{
 		public:
 			ReplaySubject() :
-				_replaySubjectImpl(ReplaySubjectImplBuffer(UINT_MAX))
+				_replaySubjectImpl(ReplaySubjectImplBuffer<T, TException>(SIZE_MAX))
 			{}
 			ReplaySubject(size_t bufferSize) :
-				_replaySubjectImpl(ReplaySubjectImplBuffer(bufferSize))
+				_replaySubjectImpl(ReplaySubjectImplBuffer<T, TException>(bufferSize))
 			{}
 			template<class Rep, class Period>
 			ReplaySubject(std::chrono::duration<Rep, Period> window) :
-				_replaySubjectImpl(ReplaySubjectImplTime(window))
+				_replaySubjectImpl(ReplaySubjectImplTime<T, TException, TClock>(std::chrono::duration_cast<TClock::duration>(window)))
 			{}
 			template<class Rep, class Period>
 			ReplaySubject(size_t bufferSize, std::chrono::duration<Rep, Period> window) :
-				_replaySubjectImpl(ReplaySubjectImplTime(bufferSize, window))
+				_replaySubjectImpl(ReplaySubjectImplTime<T, TException, TClock>(bufferSize, std::chrono::duration_cast<TClock::duration>(window)))
 			{}
 
 			bool HasObservers() const noexcept override
@@ -138,7 +141,6 @@ namespace rx
 				
 				virtual void cacheValue(const T& value) = 0;
 				virtual size_t replay(std::unique_ptr<IObserver<T, TException>>& observer) = 0;
-				virtual void trimingValues() = 0;
 			private:
 				std::map<unsigned, std::shared_ptr<SubjectDisposable<T, TException>>> _observers;
 				std::unique_ptr<TException> _exception;
@@ -170,27 +172,70 @@ namespace rx
 				}
 			};
 
-			template<typename T, typename TException = std::exception>
+			template<typename T, typename TException = std::exception, typename TClock>
 			class ReplaySubjectImplTime : ReplaySubjectImplBase<T, TException>
 			{
 			public:
 				ReplaySubjectImplTime(std::chrono::duration<Rep, Period> window);
 				ReplaySubjectImplTime(size_t bufferSize, std::chrono::duration<Rep, Period> window);
 			protected:
-				void cacheValue(const T& value) override;
-				size_t replay(std::unique_ptr<IObserver<T, TException>>& observer) override;
-				void trimingValues() override;
+				void cacheValue(const T& value) override
+				{
+					auto now = TClock::now();
+					auto duration = now - _startTime;
+					auto value_pair = std::make_pair(duration, value);
+					_valueQueue.push(value_pair);
+				}
+				size_t replay(std::unique_ptr<IObserver<T, TException>>& observer) override
+				{
+					while (_valueQueue.size() > _bufferSize)
+					{
+						_valueQueue.pop();
+					}
+					while (_valueQueue.front().first > _window)
+					{
+						_valueQueue.pop();
+					}
+					for (const auto& value_pair : _valueQueue)
+					{
+						observer->OnNext(value_pair.second);
+					}
+					return _valueQueue.size();
+				}
+			private:
+				size_t _bufferSize;
+				TClock::duration _window;
+				std::queue<std::pair<TClock::duration, T>> _valueQueue;
+				std::chrono::time_point<TClock> _startTime;
 			};
 
 			template<typename T, typename TException = std::exception>
 			class ReplaySubjectImplBuffer : ReplaySubjectImplBase<T, TException>
 			{
 			public:
-				ReplaySubjectImplBuffer(size_t bufferSize);
+				ReplaySubjectImplBuffer(size_t bufferSize) :
+					_bufferSize(bufferSize)
+				{}
 			protected:
-				void cacheValue(const T& value) override;
-				size_t replay(std::unique_ptr<IObserver<T, TException>>& observer) override;
-				void trimingValues() override;
+				void cacheValue(const T& value) override
+				{
+					_valueQueue.push(value);
+				}
+				size_t replay(std::unique_ptr<IObserver<T, TException>>& observer) override
+				{
+					while (_valueQueue.size() > _bufferSize)
+					{
+						_valueQueue.pop();
+					}
+					for (const auto& value : _valueQueue)
+					{
+						observer->OnNext(value);
+					}
+					return _valueQueue.size();
+				}
+			private:
+				size_t _bufferSize;
+				std::queue<T> _valueQueue;
 			};
 
 			ReplaySubjectImplBase<T, TException> _replaySubjectImpl;
